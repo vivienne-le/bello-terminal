@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bello Terminal (demo)</title>
+    <meta name="description" content="A demo of Bello Terminal, a retro messaging terminal by Vivienne Le. Nothing you type is sent or saved.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23030703'/%3E%3Crect x='10' y='7' width='12' height='9' fill='none' stroke='%2300ff33' stroke-width='2'/%3E%3Crect x='8' y='16' width='16' height='9' fill='none' stroke='%2300ff33' stroke-width='2'/%3E%3Crect x='13' y='10' width='2' height='2' fill='%2300ff33'/%3E%3Crect x='17' y='10' width='2' height='2' fill='%2300ff33'/%3E%3C/svg%3E">
+
+    <style>
+        :root {
+            --term-green: #00ff33;
+            --term-green-glow: rgba(0, 255, 51, 0.5);
+            --bg-dark: #030703;
+            --bg-darker: #010401;
+            --crt-scanlines: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%);
+        }
+
+        body {
+            background-color: var(--bg-darker);
+            color: var(--term-green);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            margin: 0;
+            text-shadow: 0 0 4px var(--term-green-glow);
+        }
+
+        /* --- DEMO NOTICE --- */
+        .demo-banner {
+            width: 100%;
+            max-width: 640px;
+            box-sizing: border-box;
+            border: 1px dashed rgba(0, 255, 51, 0.6);
+            border-radius: 4px;
+            padding: 10px 14px;
+            margin-bottom: 26px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: rgba(0, 255, 51, 0.85);
+        }
+        .demo-banner strong { color: var(--term-green); }
+
+        /* --- CRT MONITOR DISPLAY --- */
+        .terminal-screen {
+            background-color: var(--bg-dark);
+            width: 100%;
+            max-width: 640px;
+            height: 380px;
+            position: relative;
+            box-sizing: border-box;
+            padding: 20px;
+            overflow: hidden;
+            background-size: 100% 4px;
+            background-image: var(--crt-scanlines);
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.9), 0 0 15px rgba(0, 255, 51, 0.1);
+            border-radius: 4px;
+        }
+
+        .border-frame {
+            border: 2px solid var(--term-green);
+            height: 100%;
+            width: 100%;
+            box-sizing: border-box;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 10px var(--term-green-glow), inset 0 0 10px var(--term-green-glow);
+        }
+
+        .title-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--bg-dark);
+            padding: 0 12px;
+            color: var(--term-green);
+            font-weight: bold;
+            font-size: 1.05rem;
+            letter-spacing: 1px;
+            text-shadow: 0 0 8px var(--term-green-glow);
+            white-space: nowrap;
+        }
+
+        /* --- THE CHARACTER CANVAS AREA --- */
+        .character-view {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .robot-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .robot-head {
+            width: 56px;
+            height: 42px;
+            border: 2px solid var(--term-green);
+            background-color: var(--bg-dark);
+            box-shadow: 0 0 8px var(--term-green-glow), inset 0 0 8px var(--term-green-glow);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Sweat drop (stressed mode) */
+        .robot-sweat {
+            position: absolute;
+            top: 25px;
+            right: 50px;
+            width: 7px;
+            height: 7px;
+            border: 2px solid var(--term-green);
+            background-color: var(--bg-dark);
+            border-radius: 50% 0 50% 50%;
+            box-shadow: 0 0 6px var(--term-green-glow);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 3;
+        }
+
+        /* Glasses (working mode) */
+        .robot-glasses {
+            position: absolute;
+            width: 48px;
+            height: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 3;
+        }
+        .glass-frame {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--term-green);
+            border-radius: 2px;
+            box-shadow: 0 0 6px var(--term-green-glow);
+            background-color: rgba(0, 255, 51, 0.1);
+        }
+        .glass-bridge {
+            width: 8px;
+            height: 2px;
+            background-color: var(--term-green);
+            box-shadow: 0 0 4px var(--term-green-glow);
+        }
+
+        /* Eyes & blinking */
+        .robot-eye {
+            width: 8px;
+            height: 8px;
+            background-color: var(--term-green);
+            box-shadow: 0 0 6px var(--term-green-glow);
+            transition: height 0.1s ease, width 0.1s ease;
+            animation: periodicBlink 2.5s infinite linear;
+        }
+
+        @keyframes periodicBlink {
+            0%, 92%, 100% { height: 8px; transform: translateY(0); }
+            96% { height: 2px; transform: translateY(3px); }
+        }
+
+        .robot-mouth {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .robot-body {
+            width: 76px;
+            height: 48px;
+            border: 2px solid var(--term-green);
+            background-color: var(--bg-dark);
+            box-shadow: 0 0 8px var(--term-green-glow), inset 0 0 8px var(--term-green-glow);
+            z-index: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            margin-top: -2px;
+        }
+
+        .robot-hands {
+            position: absolute;
+            bottom: -8px;
+            display: flex;
+            gap: 24px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .hand {
+            width: 16px;
+            height: 6px;
+            background-color: var(--term-green);
+            border-radius: 2px;
+            box-shadow: 0 0 6px var(--term-green-glow);
+            transition: all 0.2s ease;
+        }
+
+        /* --- MOODS --- */
+        .mood-idle .robot-hands { opacity: 1; }
+        .mood-idle .right-hand { opacity: 0; }
+        .mood-idle .left-hand {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            animation: waveCircle 0.4s ease-in-out infinite alternate;
+        }
+        .mood-idle .robot-mouth {
+            opacity: 1;
+            width: 8px;
+            height: 4px;
+            border: 2px solid var(--term-green);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 2px 4px var(--term-green-glow);
+            bottom: 6px;
+        }
+
+        .mood-pulse { animation: placeholderHop 0.4s steps(2) infinite alternate; }
+        .mood-pulse .robot-mouth {
+            opacity: 1;
+            animation: kissPucker 0.4s steps(2) infinite alternate;
+        }
+        .mood-pulse .robot-mouth::after {
+            content: '3';
+            color: var(--term-green);
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 1;
+            text-shadow: 0 0 6px var(--term-green-glow);
+            display: block;
+        }
+
+        .mood-study { animation: none; transform: translateY(2px); }
+        .mood-study .robot-glasses { opacity: 1; }
+        .mood-study .robot-hands { opacity: 1; }
+        .mood-study .robot-eye { animation: none !important; }
+        .mood-study .left-hand { animation: typingTap 0.14s infinite alternate; }
+        .mood-study .right-hand { animation: typingTap 0.18s infinite alternate 0.1s; }
+
+        .mood-anxious { animation: subtleJitter 2s linear infinite; }
+        .mood-anxious .robot-sweat {
+            opacity: 1;
+            animation: sweatPulse 0.4s steps(2) infinite alternate;
+        }
+        .mood-anxious .robot-eye {
+            animation: none !important;
+            height: 10px;
+            width: 8px;
+        }
+        .mood-anxious .robot-mouth {
+            opacity: 1;
+            width: 12px;
+            height: 4px;
+            border: 2px solid var(--term-green);
+            border-bottom: none;
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 -2px 4px var(--term-green-glow);
+            bottom: 4px;
+        }
+
+        @keyframes waveCircle {
+            0% { transform: translate(-27px, -35px); }
+            100% { transform: translate(-15px, -40px); }
+        }
+        @keyframes typingTap {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-4px); }
+        }
+        @keyframes placeholderHop {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+        @keyframes kissPucker {
+            0% { transform: translateX(-50%) scale(0.9); }
+            100% { transform: translateX(-50%) scale(1.2); }
+        }
+        @keyframes subtleJitter {
+            0% { transform: translate(1px, 0); }
+            33% { transform: translate(-1px, 1px); }
+            66% { transform: translate(0, -1px); }
+            100% { transform: translate(1px, 0); }
+        }
+        @keyframes sweatPulse {
+            0% { transform: scale(1) translateY(0); }
+            100% { transform: scale(1.05) translateY(1px); }
+        }
+
+        /* --- HEARTS --- */
+        .heart-particle {
+            position: absolute;
+            color: var(--term-green);
+            font-size: 1.4rem;
+            text-shadow: 0 0 6px var(--term-green-glow);
+            pointer-events: none;
+            animation: floatHeart 1.5s linear forwards;
+            z-index: 5;
+        }
+        @keyframes floatHeart {
+            0% { transform: translateY(40px) scale(0.5); opacity: 0; }
+            15% { opacity: 1; }
+            100% { transform: translateY(-120px) scale(1.2) translateX(var(--drift-x, 0px)); opacity: 0; }
+        }
+
+        /* --- MESSAGE LOG --- */
+        .message-log {
+            height: 135px;
+            border-top: 2px solid var(--term-green);
+            box-sizing: border-box;
+            padding: 15px;
+            font-size: 0.95rem;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .meta-line { color: var(--term-green); font-weight: bold; }
+        .content-line {
+            color: var(--term-green);
+            margin-top: 4px;
+            word-break: break-word;
+        }
+        .content-line::after {
+            content: '_';
+            animation: blinkCursor 0.8s steps(2) infinite;
+        }
+        @keyframes blinkCursor {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        .link-line {
+            color: rgba(0, 255, 51, 0.6);
+            font-size: 0.85rem;
+            margin-top: auto;
+        }
+
+        /* --- METADATA STRIP --- */
+        .dashboard-meta {
+            width: 100%;
+            max-width: 640px;
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+        .meta-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .meta-block span:first-child {
+            color: rgba(0, 255, 51, 0.6);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .meta-block span:last-child { color: var(--term-green); font-weight: bold; }
+
+        /* --- CONTROLS --- */
+        .control-panel {
+            width: 100%;
+            max-width: 640px;
+            margin-top: 25px;
+            border-top: 1px solid var(--term-green);
+            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: inset 0 4px 4px -4px var(--term-green-glow);
+        }
+        .control-row { display: flex; align-items: center; gap: 15px; }
+        .control-label {
+            width: 100px;
+            flex-shrink: 0;
+            font-size: 0.95rem;
+            color: var(--term-green);
+            font-weight: bold;
+        }
+        .input-wrapper-group { display: flex; flex: 1; gap: 12px; align-items: stretch; min-width: 0; }
+        .large-input-box {
+            flex: 1;
+            min-width: 0;
+            padding: 12px 16px;
+            border: 1px solid var(--term-green);
+            background-color: var(--bg-dark);
+            color: var(--term-green);
+            border-radius: 4px;
+            outline: none;
+            font-size: 0.95rem;
+            font-family: inherit;
+            text-shadow: 0 0 4px var(--term-green-glow);
+            box-shadow: inset 0 0 6px rgba(0, 255, 51, 0.2);
+        }
+        .large-input-box::placeholder { color: rgba(0, 255, 51, 0.4); }
+        .large-input-box:focus-visible, .select-menu:focus-visible, .send-action-btn:focus-visible {
+            outline: 2px solid var(--term-green); outline-offset: 2px;
+        }
+        .send-action-btn {
+            background-color: var(--term-green);
+            color: var(--bg-dark);
+            border: none;
+            border-radius: 4px;
+            padding: 0 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-family: inherit;
+            box-shadow: 0 0 8px var(--term-green-glow);
+            transition: background-color 0.1s, box-shadow 0.1s;
+        }
+        .send-action-btn:hover { background-color: #33ff66; box-shadow: 0 0 12px #33ff66; }
+        .send-action-btn:disabled { opacity: 0.5; cursor: wait; }
+        .select-menu {
+            flex: 1;
+            padding: 10px 16px;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--term-green);
+            color: var(--term-green);
+            border-radius: 4px;
+            outline: none;
+            font-family: inherit;
+            cursor: pointer;
+            font-size: 0.95rem;
+            text-shadow: 0 0 4px var(--term-green-glow);
+        }
+        .select-menu option { background-color: var(--bg-dark); color: var(--term-green); }
+
+        .footer-note {
+            max-width: 640px;
+            width: 100%;
+            margin-top: 28px;
+            font-size: 0.8rem;
+            color: rgba(0, 255, 51, 0.55);
+            text-align: center;
+        }
+        .footer-note a { color: var(--term-green); }
+
+        @media (max-width: 520px) {
+            body { padding: 24px 14px; }
+            .title-badge { font-size: 0.85rem; }
+            .control-row { flex-direction: column; align-items: stretch; gap: 8px; }
+            .control-label { width: auto; }
+            .send-action-btn { padding: 12px 16px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <p class="demo-banner"><strong>&gt; DEMO MODE.</strong> This is a playable copy of Bello Terminal, a little messaging terminal I built. Nothing you type is sent or saved. The robot and the replies are just for fun.</p>
+
+    <div class="terminal-screen">
+        <div class="border-frame">
+            <div class="title-badge">[ BELLO_TERMINAL_DEMO ]</div>
+
+            <div class="character-view" id="canvasZone">
+                <div id="robotWrapper" class="robot-container mood-idle">
+                    <div class="robot-head">
+                        <div class="robot-sweat"></div>
+                        <div class="robot-glasses">
+                            <div class="glass-frame"></div>
+                            <div class="glass-bridge"></div>
+                            <div class="glass-frame"></div>
+                        </div>
+                        <div class="robot-eye"></div>
+                        <div class="robot-eye"></div>
+                        <div class="robot-mouth"></div>
+                    </div>
+                    <div class="robot-body">
+                        <div class="robot-hands">
+                            <div class="hand left-hand"></div>
+                            <div class="hand right-hand"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="message-log" aria-live="polite">
+                <div class="meta-line">SENDER: <span id="senderTag">VIVI</span></div>
+                <div class="meta-line">RECIPIENT: <span id="recipientTag">VISITOR</span></div>
+                <div class="content-line" id="messageTextField">&gt; </div>
+                <div class="link-line">REPLY LINK: local://demo_</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-meta">
+        <div class="meta-block">
+            <span>Status</span>
+            <span id="statusText">Demo Online</span>
+        </div>
+        <div class="meta-block">
+            <span>Perspective</span>
+            <span>Visitor's View</span>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <div class="control-row">
+            <label class="control-label" for="transmitInput">Message</label>
+            <div class="input-wrapper-group">
+                <input type="text" id="transmitInput" class="large-input-box" placeholder="Type transmission..." autocomplete="off" maxlength="140">
+                <button id="sendPacketBtn" class="send-action-btn">Send Packet</button>
+            </div>
+        </div>
+
+        <div class="control-row">
+            <label class="control-label" for="moodSelect">Mood Mode</label>
+            <select id="moodSelect" class="select-menu">
+                <option value="idle">Idle</option>
+                <option value="pulse">Sending love</option>
+                <option value="study">Working</option>
+                <option value="anxious">Stressed / Anxious</option>
+            </select>
+        </div>
+    </div>
+
+    <p class="footer-note">Try words like "love", "work" or "stress" and watch the robot react.</p>
+
+    <script>
+        // DEMO MODE: no database, no network. Everything happens in this page.
+        const messageTextField = document.getElementById('messageTextField');
+        const senderTag = document.getElementById('senderTag');
+        const recipientTag = document.getElementById('recipientTag');
+        const robotWrapper = document.getElementById('robotWrapper');
+        const canvasZone = document.getElementById('canvasZone');
+        const statusText = document.getElementById('statusText');
+        const transmitInput = document.getElementById('transmitInput');
+        const sendPacketBtn = document.getElementById('sendPacketBtn');
+        const moodSelect = document.getElementById('moodSelect');
+
+        // Pre-written replies from Vivi, picked by mood
+        const replies = {
+            pulse: [
+                "aww, sending love right back <3",
+                "that made my day. <3 <3",
+            ],
+            study: [
+                "same here! back to work, we've got this.",
+                "productivity mode: on. coffee mode: also on.",
+            ],
+            anxious: [
+                "deep breath. one thing at a time, you've got this.",
+                "it's okay. take a little break, the robot believes in you.",
+            ],
+            idle: [
+                "hi! thanks for stopping by my portfolio :)",
+                "packet received! (it's a demo, so it went nowhere, but I appreciate it)",
+                "beep boop. the robot says hello!",
+            ],
+        };
+        const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+        let lastMessage = "";
+        let typingInterval = null;
+        let heartInterval = null;
+        let replyTimer = null;
+
+        function setTags(sender) {
+            senderTag.innerText = sender;
+            recipientTag.innerText = sender === "VIVI" ? "VISITOR" : "VIVI";
+        }
+
+        function typewriter(text, done) {
+            clearInterval(typingInterval);
+            let i = 0;
+            messageTextField.innerText = "> ";
+            typingInterval = setInterval(() => {
+                if (i < text.length) {
+                    messageTextField.innerText += text.charAt(i++);
+                } else {
+                    clearInterval(typingInterval);
+                    if (done) done();
+                }
+            }, 40);
+        }
+
+        function spawnHeart() {
+            const heart = document.createElement('div');
+            heart.className = 'heart-particle';
+            heart.innerText = '<3';
+            heart.style.setProperty('--drift-x', (Math.random() * 60 - 30) + 'px');
+            heart.style.left = (Math.random() * 60 + 20) + '%';
+            canvasZone.appendChild(heart);
+            setTimeout(() => heart.remove(), 1500);
+        }
+        function startHearts() {
+            clearInterval(heartInterval);
+            for (let i = 0; i < 3; i++) setTimeout(spawnHeart, i * 150);
+            heartInterval = setInterval(spawnHeart, 400);
+        }
+        function stopHearts() { clearInterval(heartInterval); }
+
+        function setMood(mood) {
+            moodSelect.value = mood;
+            robotWrapper.className = "robot-container mood-" + mood;
+            mood === "pulse" ? startHearts() : stopHearts();
+        }
+
+        function moodFromText(text) {
+            const t = text.toLowerCase();
+            if (t.includes('love') || t.includes('<3') || t.includes('miss')) return "pulse";
+            if (t.includes('study') || t.includes('work') || t.includes('exam')) return "study";
+            if (t.includes('stress') || t.includes('anxious') || t.includes('worry') || t.includes('panic')) return "anxious";
+            return "idle";
+        }
+
+        function showMessage(text, sender, mood) {
+            lastMessage = text;
+            setTags(sender);
+            setMood(mood);
+            typewriter(text);
+        }
+
+        function send() {
+            const text = transmitInput.value.trim();
+            if (!text) return;
+            transmitInput.value = '';
+            clearTimeout(replyTimer);
+
+            const mood = moodFromText(text);
+            showMessage(text, "VISITOR", mood);
+
+            // Vivi "types" a reply: glasses on, hands tapping
+            sendPacketBtn.disabled = true;
+            statusText.innerText = "Vivi is typing...";
+            replyTimer = setTimeout(() => {
+                robotWrapper.className = "robot-container mood-study";
+                stopHearts();
+                replyTimer = setTimeout(() => {
+                    showMessage(pick(replies[mood]), "VIVI", mood);
+                    statusText.innerText = "Demo Online";
+                    sendPacketBtn.disabled = false;
+                }, 1400);
+            }, 900 + text.length * 40);
+        }
+
+        sendPacketBtn.addEventListener('click', send);
+        transmitInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+        moodSelect.addEventListener('change', () => setMood(moodSelect.value));
+
+        // Opening message
+        showMessage("hi! type a message and press Send Packet.", "VIVI", "idle");
+    </script>
+</body>
+</html>
